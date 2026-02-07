@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel - Shanthi Masala</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    .box {
+      background: #fff;
+      padding: 20px;
+      max-width: 550px;
+      margin: auto;
+      border-radius: 10px;
+    }
+    input, textarea, select, button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 8px;
+    }
+    button {
+      background: #ff5722;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .product {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+    .product img {
+      width: 80px;
+      margin-top: 5px;
+    }
+    .actions button {
+      margin-top: 5px;
+    }
+    #dashboard p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- 🔐 LOGIN PROTECTION -->
+<script>
+if (!localStorage.getItem("admin")) {
+  window.location.href = "login.html";
+}
+</script>
+
+<div class="box">
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <p><b>Total Products:</b> <span id="totalProducts">0</span></p>
+    <p><b>Total Stock:</b> <span id="totalStock">0</span></p>
+    <p><b>Out of Stock:</b> <span id="outStock">0</span></p>
+  </div>
+
+  <h2 id="formTitle">Add Product</h2>
+
+  <!-- SEARCH & FILTER -->
+  <input
+    type="text"
+    id="search"
+    placeholder="Search product name..."
+    onkeyup="loadProducts()"
+  >
+
+  <select id="filter" onchange="loadProducts()">
+    <option value="all">All Products</option>
+    <option value="instock">In Stock</option>
+    <option value="outstock">Out of Stock</option>
+  </select>
+
+  <!-- FORM -->
+  <input id="name" placeholder="Product Name">
+  <input id="price" type="number" placeholder="Price">
+  <input id="weight" placeholder="Weight (eg: 250g)">
+  <input id="stock" type="number" placeholder="Stock Quantity">
+  <textarea id="description" placeholder="Description"></textarea>
+  <input type="file" id="image">
+
+  <button id="submitBtn" onclick="saveProduct()">Add Product</button>
+
+  <h3 style="margin-top:20px;">All Products</h3>
+  <div id="list"></div>
+
+  <button onclick="logout()" style="background:#333;margin-top:20px;">
+    Logout
+  </button>
+</div>
+
+<script>
+const API = "http://localhost:5000/api/products";
+let editId = null;
+
+/* LOAD PRODUCTS */
+async function loadProducts() {
+  const searchText = document.getElementById("search").value.toLowerCase();
+  const filter = document.getElementById("filter").value;
+
+  const res = await fetch(API);
+  const products = await res.json();
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  let totalStock = 0;
+  let outStock = 0;
+
+  products.forEach(p => {
+
+    // SEARCH FILTER
+    if (!p.name.toLowerCase().includes(searchText)) return;
+
+    // STOCK FILTER
+    if (filter === "instock" && p.stock <= 0) return;
+    if (filter === "outstock" && p.stock > 0) return;
+
+    totalStock += p.stock;
+    if (p.stock <= 0) outStock++;
+
+    list.innerHTML += `
+      <div class="product">
+        <b>${p.name}</b><br>
+        ₹${p.price} | Stock: ${p.stock}
+        <img src="http://localhost:5000${p.image}">
+        <div class="actions">
+          <button onclick="editProduct('${p._id}')">✏️ Edit</button>
+          <button onclick="deleteProduct('${p._id}')">❌ Delete</button>
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById("totalProducts").innerText = products.length;
+  document.getElementById("totalStock").innerText = totalStock;
+  document.getElementById("outStock").innerText = outStock;
+}
+
+/* EDIT PRODUCT */
+async function editProduct(id) {
+  const res = await fetch(API);
+  const products = await res.json();
+  const p = products.find(x => x._id === id);
+
+  name.value = p.name;
+  price.value = p.price;
+  weight.value = p.weight;
+  stock.value = p.stock;
+  description.value = p.description;
+
+  editId = id;
+  document.getElementById("formTitle").innerText = "Edit Product";
+  document.getElementById("submitBtn").innerText = "Update Product";
+}
+
+/* ADD / UPDATE */
+async function saveProduct() {
+  const formData = new FormData();
+  formData.append("name", name.value);
+  formData.append("price", price.value);
+  formData.append("weight", weight.value);
+  formData.append("description", description.value);
+  formData.append("stock", stock.value);
+
+  if (image.files[0]) {
+    formData.append("image", image.files[0]);
+  }
+
+  if (editId) {
+    await fetch(`${API}/${editId}`, {
+      method: "PUT",
+      body: formData
+    });
+    editId = null;
+    document.getElementById("formTitle").innerText = "Add Product";
+    document.getElementById("submitBtn").innerText = "Add Product";
+  } else {
+    await fetch(API, {
+      method: "POST",
+      body: formData
+    });
+  }
+
+  clearForm();
+  loadProducts();
+}
+
+/* DELETE */
+async function deleteProduct(id) {
+  await fetch(`${API}/${id}`, { method: "DELETE" });
+  loadProducts();
+}
+
+/* CLEAR FORM */
+function clearForm() {
+  name.value = "";
+  price.value = "";
+  weight.value = "";
+  stock.value = "";
+  description.value = "";
+  image.value = "";
+}
+
+/* LOGOUT */
+function logout() {
+  localStorage.removeItem("admin");
+  window.location.href = "login.html";
+}
+
+window.onload = loadProducts;
+</script>
+
+</body>
+</html>
